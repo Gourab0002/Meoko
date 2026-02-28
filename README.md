@@ -1,10 +1,20 @@
-# Nyaa-Api-Ts
+# Meoko — Unofficial Nyaa API
 
-[![Deploy to Cloudflare Workers](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/Yash-Garg/Nyaa-Api-Ts)
+A fast, type-safe **Unofficial Nyaa torrent API** built with TypeScript, [Hono](https://hono.dev/), and deployed on **Cloudflare Workers** or **Deno Deploy**.
 
-This API is an **Unofficial Nyaa API** rewritten in Typescript.
+> Inspired by [Yash-Garg/Nyaa-Api-Go](https://github.com/Yash-Garg/Nyaa-Api-Go) — this is a full TypeScript rewrite with extended capabilities and bug fixes.
 
-Previous Go API - [Yash-Garg/Nyaa-Api-Go](https://github.com/Yash-Garg/Nyaa-Api-Go)
+## Capabilities
+
+- 🔍 **Full-text search** across all Nyaa categories using flexible query parameters
+- 📂 **Category & sub-category browsing** — Anime, Manga, Audio, Pictures, Live Action, Software
+- 🧑 **User uploads** — fetch all torrents uploaded by a specific Nyaa user
+- 🆔 **Lookup by ID** — retrieve detailed torrent info for any Nyaa entry
+- 🔃 **Sorting & filtering** — sort by size, seeders, leechers, date, or downloads; filter out remakes or show trusted-only
+- 📄 **Pagination** — navigate through any result set page by page
+- 🌐 **CORS-enabled** — ready for use from any browser or frontend application
+- ⚡ **Edge-deployed** — runs on Cloudflare Workers or Deno Deploy for low-latency responses worldwide
+- 🛡️ **Null-safe scraping** — hardened against missing DOM elements and unexpected Nyaa markup changes
 
 ## Usage
 
