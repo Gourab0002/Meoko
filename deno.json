@@ -1,9 +1,7 @@
 {
   "imports": {
-    "worktop": "npm:worktop@^0.7.3",
-    "worktop/cors": "npm:worktop@^0.7.3/cors",
-    "worktop/response": "npm:worktop@^0.7.3/response",
-    "worktop/request": "npm:worktop@^0.7.3/request",
+    "hono": "npm:hono@^4.6.0",
+    "hono/cors": "npm:hono@^4.6.0/cors",
     "cheerio": "npm:cheerio@^1.0.0-rc.12"
   },
   "compilerOptions": {
