@@ -7,7 +7,6 @@
     "cheerio": "npm:cheerio@^1.0.0-rc.12"
   },
   "compilerOptions": {
-    "lib": ["deno.window", "ES2021"],
-    "allowJs": true
+    "lib": ["deno.window", "ES2021"]
   }
 }
