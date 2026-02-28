@@ -1,4 +1,4 @@
-import { listen, Router } from "worktop";
+import { Router } from "worktop";
 import * as CORS from "worktop/cors";
 import { Handlers } from "./routes.ts";
 
@@ -16,4 +16,6 @@ API.add("GET", "/user/:username", Handlers.GetUserUploads);
 API.add("GET", "/:category", Handlers.GetCategoryTorrents);
 API.add("GET", "/:category/:subcategory", Handlers.GetCategoryTorrents);
 
-listen(API.run);
+Deno.serve({ port: 3000 }, (request: Request) => {
+  return API.run({ request } as any);
+});
