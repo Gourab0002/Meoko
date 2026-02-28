@@ -1,7 +1,7 @@
 import { Handler } from "worktop";
-import * as Scrapers from "./scrapers";
-import { Constants } from "./constants";
-import * as Utils from "./utils";
+import * as Scrapers from "./scrapers.ts";
+import { Constants } from "./constants.ts";
+import * as Utils from "./utils.ts";
 
 const baseUrl = Constants.NyaaBaseUrl;
 
