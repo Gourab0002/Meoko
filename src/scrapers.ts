@@ -1,9 +1,9 @@
 import { Constants } from "./constants.ts";
 import * as cheerio from "cheerio";
-import type { ServerResponse } from "worktop/response";
+import { Context } from "hono";
 import * as Models from "./models.ts";
 
-export async function fileInfoScraper(res: ServerResponse, url: string) {
+export async function fileInfoScraper(c: Context, url: string) {
   const response = await fetch(url);
 
   if (response.status === 200) {
@@ -96,13 +96,13 @@ export async function fileInfoScraper(res: ServerResponse, url: string) {
       },
     };
 
-    res.send(200, file);
+    return c.json(file);
   } else {
-    res.send(404, "Not Found");
+    return c.text("Not Found", 404);
   }
 }
 
-export async function scrapeNyaa(res: ServerResponse, url: string) {
+export async function scrapeNyaa(c: Context, url: string) {
   const response = await fetch(url);
 
   if (response.status === 200) {
@@ -134,8 +134,8 @@ export async function scrapeNyaa(res: ServerResponse, url: string) {
       torrents.push(torrent);
     });
 
-    res.send(200, torrents);
+    return c.json(torrents);
   } else {
-    res.send(404, "Not Found");
+    return c.text("Not Found", 404);
   }
 }

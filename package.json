@@ -17,7 +17,7 @@
   },
   "dependencies": {
     "cheerio": "^1.0.0-rc.12",
-    "ts-node": "^10.9.1",
-    "worktop": "^0.7.3"
+    "hono": "^4.6.0",
+    "ts-node": "^10.9.1"
   }
 }

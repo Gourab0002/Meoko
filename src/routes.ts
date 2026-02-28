@@ -1,4 +1,4 @@
-import { Handler } from "worktop";
+import { Context } from "hono";
 import * as Scrapers from "./scrapers.ts";
 import { Constants } from "./constants.ts";
 import * as Utils from "./utils.ts";
@@ -6,51 +6,51 @@ import * as Utils from "./utils.ts";
 const baseUrl = Constants.NyaaBaseUrl;
 
 export class Handlers {
-  static Ping: Handler = function (_, res) {
-    res.send(200, "Nyaa API v2 // Alive");
+  static Ping = function (c: Context) {
+    return c.text("Nyaa API v2 // Alive");
   };
 
-  static GetInfoFromID: Handler = async function (req, res) {
+  static GetInfoFromID = async function (c: Context) {
     try {
-      const id = req.params.id;
+      const id = c.req.param("id");
       const searchUrl = baseUrl + "/view/" + id;
 
-      await Scrapers.fileInfoScraper(res, searchUrl);
+      return await Scrapers.fileInfoScraper(c, searchUrl);
     } catch (error) {
-      res.send(404, "Not Found");
+      return c.text("Not Found", 404);
     }
   };
 
-  static GetUserUploads: Handler = async function (req, res) {
+  static GetUserUploads = async function (c: Context) {
     try {
-      const username = req.params.username;
-      const queryParams = Utils.getSearchParameters(req);
+      const username = c.req.param("username");
+      const queryParams = Utils.getSearchParameters(c);
 
       const searchUrl = `${baseUrl}/user/${username}?q=${queryParams.query.trim()}&p=${
         queryParams.page
       }&s=${queryParams.sort}&o=${queryParams.order}&f=${queryParams.filter}`;
 
-      await Scrapers.scrapeNyaa(res, searchUrl);
+      return await Scrapers.scrapeNyaa(c, searchUrl);
     } catch (error) {
-      res.send(404, "Not Found");
+      return c.text("Not Found", 404);
     }
   };
 
-  static GetCategoryTorrents: Handler = async function (req, res) {
+  static GetCategoryTorrents = async function (c: Context) {
     try {
-      const cat = req.params.category;
-      const subCat = req.params.subcategory;
+      const cat = c.req.param("category");
+      const subCat = c.req.param("subcategory");
 
       const category = Utils.getCategoryID(cat, subCat);
-      const queryParams = Utils.getSearchParameters(req);
+      const queryParams = Utils.getSearchParameters(c);
 
       const searchUrl = `${baseUrl}?q=${queryParams.query.trim()}&c=${category}&p=${
         queryParams.page
       }&s=${queryParams.sort}&o=${queryParams.order}&f=${queryParams.filter}`;
 
-      await Scrapers.scrapeNyaa(res, searchUrl);
+      return await Scrapers.scrapeNyaa(c, searchUrl);
     } catch (error) {
-      res.send(404, "Not Found");
+      return c.text("Not Found", 404);
     }
   };
 }

@@ -1,21 +1,22 @@
-import { Router } from "worktop";
-import * as CORS from "worktop/cors";
+import { Hono } from "hono";
+import { cors } from "hono/cors";
 import { Handlers } from "./routes.ts";
 
-const API = new Router();
+const app = new Hono();
 
-API.prepare = CORS.preflight({
-  origin: "*",
-  headers: ["Cache-Control", "Content-Type"],
-  methods: ["GET"],
-});
+app.use(
+  "*",
+  cors({
+    origin: "*",
+    allowHeaders: ["Cache-Control", "Content-Type"],
+    allowMethods: ["GET"],
+  })
+);
 
-API.add("GET", "/", Handlers.Ping);
-API.add("GET", "/id/:id", Handlers.GetInfoFromID);
-API.add("GET", "/user/:username", Handlers.GetUserUploads);
-API.add("GET", "/:category", Handlers.GetCategoryTorrents);
-API.add("GET", "/:category/:subcategory", Handlers.GetCategoryTorrents);
+app.get("/", Handlers.Ping);
+app.get("/id/:id", Handlers.GetInfoFromID);
+app.get("/user/:username", Handlers.GetUserUploads);
+app.get("/:category", Handlers.GetCategoryTorrents);
+app.get("/:category/:subcategory", Handlers.GetCategoryTorrents);
 
-Deno.serve({ port: 3000 }, (request: Request) => {
-  return API.run({ request } as any);
-});
+Deno.serve({ port: 3000 }, app.fetch);
