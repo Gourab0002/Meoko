@@ -1,6 +1,6 @@
 import { ServerRequest } from "worktop/request";
-import { Constants } from "./constants";
-import { QueryParams } from "./models";
+import { Constants } from "./constants.ts";
+import { QueryParams } from "./models.ts";
 
 export function getCategoryID(c: string, s: string): string {
   const endpoints = Constants.NyaaEndpoints;

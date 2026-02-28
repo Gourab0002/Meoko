@@ -1,6 +1,6 @@
 import { listen, Router } from "worktop";
 import * as CORS from "worktop/cors";
-import { Handlers } from "./routes";
+import { Handlers } from "./routes.ts";
 
 const API = new Router();
 

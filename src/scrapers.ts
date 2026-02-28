@@ -1,7 +1,7 @@
-import { Constants } from "./constants";
+import { Constants } from "./constants.ts";
 import * as cheerio from "cheerio";
 import type { ServerResponse } from "worktop/response";
-import * as Models from "./models";
+import * as Models from "./models.ts";
 
 export async function fileInfoScraper(res: ServerResponse, url: string) {
   const response = await fetch(url);
