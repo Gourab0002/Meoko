@@ -106,5 +106,10 @@ The following issues were identified and resolved across the codebase:
 - **Removed dead code in `utils.ts`** -- `checkNyaaUrl()` was defined but never called anywhere. Removed to reduce maintenance burden.
 - **Fixed URL usage in `routes.ts`** -- Changed from hardcoded `NyaaAltUrl` to `NyaaBaseUrl` so the primary URL is used by default.
 
+#### Deno Deploy Compatibility
+- **Added `.ts` extensions to all local imports** -- Deno requires explicit file extensions on relative imports. Updated all `import` statements across `index.ts`, `routes.ts`, `scrapers.ts`, and `utils.ts`.
+- **Added `deno.json` configuration** -- Created import map to resolve bare npm specifiers (`worktop`, `cheerio`) to `npm:` prefixed specifiers that Deno understands.
+- **Enabled `allowImportingTsExtensions` in `tsconfig.json`** -- Required so TypeScript accepts `.ts` extensions in import paths.
+
 #### Minor
 - **Missing semicolon in `scrapers.ts`** -- Added missing semicolon after `const fileId = Number(url.split("/")[4])`.

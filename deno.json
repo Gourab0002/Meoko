@@ -1,0 +1,13 @@
+{
+  "imports": {
+    "worktop": "npm:worktop@^0.7.3",
+    "worktop/cors": "npm:worktop@^0.7.3/cors",
+    "worktop/response": "npm:worktop@^0.7.3/response",
+    "worktop/request": "npm:worktop@^0.7.3/request",
+    "cheerio": "npm:cheerio@^1.0.0-rc.12"
+  },
+  "compilerOptions": {
+    "lib": ["deno.window", "ES2021"],
+    "allowJs": true
+  }
+}
