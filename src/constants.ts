@@ -1,10 +1,10 @@
 export class Constants {
   static NyaaBaseUrl: string = "https://nyaa.si";
-  static NyaaAltUrl: string = "https://nyaa.si";
+  static NyaaAltUrl: string = "https://nyaa.land";
   static DefaultProfilePic: string =
     "https://raw.githubusercontent.com/Yash-Garg/Nyaa-Api-Go/dev/static/default.png";
 
-  static NyaaEndpoints: Object = {
+  static NyaaEndpoints: Record<string, Record<string, string>> = {
     all: {
       all: "0_0",
     },

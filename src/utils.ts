@@ -2,29 +2,19 @@ import { ServerRequest } from "worktop/request";
 import { Constants } from "./constants";
 import { QueryParams } from "./models";
 
-export async function checkNyaaUrl(): Promise<string> {
-  try {
-    const resp = await fetch(Constants.NyaaBaseUrl);
-
-    console.log("NyaaBaseUrl Status:", resp.statusText);
-
-    if (resp.status === 200) {
-      return Constants.NyaaBaseUrl;
-    } else {
-      return Constants.NyaaAltUrl;
-    }
-  } catch (error) {
-    console.log("NyaaBaseUrl Error:", error ?? "Something went wrong.");
-    return Constants.NyaaAltUrl;
-  }
-}
-
 export function getCategoryID(c: string, s: string): string {
-  if (s === undefined) {
-    return Constants.NyaaEndpoints[c]["all"];
-  } else {
-    return Constants.NyaaEndpoints[c][s];
+  const endpoints = Constants.NyaaEndpoints;
+  const category = endpoints[c];
+
+  if (!category) {
+    return "0_0";
   }
+
+  if (s === undefined) {
+    return category["all"] ?? "0_0";
+  }
+
+  return category[s] ?? category["all"] ?? "0_0";
 }
 
 export function getSearchParameters(req: ServerRequest): QueryParams {

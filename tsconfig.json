@@ -3,7 +3,8 @@
         "allowJs": true,
         "rootDir": "src",
         "lib": [
-            "ES2021.String"
+            "ES2021",
+            "WebWorker"
         ]
     }
 }

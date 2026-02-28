@@ -3,7 +3,7 @@ import * as Scrapers from "./scrapers";
 import { Constants } from "./constants";
 import * as Utils from "./utils";
 
-const baseUrl = Constants.NyaaAltUrl;
+const baseUrl = Constants.NyaaBaseUrl;
 
 export class Handlers {
   static Ping: Handler = function (_, res) {

@@ -11,7 +11,7 @@ export async function fileInfoScraper(res: ServerResponse, url: string) {
 
     const $ = cheerio.load(responseBody);
     const container = $("body div.container").last();
-    const fileId = Number(url.split("/")[4])
+    const fileId = Number(url.split("/")[4]);
 
     const torrentData: Models.Torrent = {
       title: container.find("h3.panel-title").first().text().trim(),
@@ -20,7 +20,7 @@ export async function fileInfoScraper(res: ServerResponse, url: string) {
         container.find("div.panel-footer a").attr("href"),
       link: `${Constants.NyaaBaseUrl}/view/${fileId}`,
       id: fileId,
-      magnet: container.find("div.panel-footer a:nth-child(2)").attr("href")!,
+      magnet: container.find("div.panel-footer a:nth-child(2)").attr("href") ?? "",
       size: container
         .find("div.panel-body div.row:nth-child(4) .col-md-5:nth-child(2)")
         .text()
@@ -114,21 +114,21 @@ export async function scrapeNyaa(res: ServerResponse, url: string) {
     let torrents: Models.Torrent[] = [];
     table.find("tr").each((_, selection) => {
       const row = $(selection);
-      const torrentPath = row.find("td:nth-child(2) a").last().attr("href");
-      const filePath = row.find("td:nth-child(3) a:nth-child(1)").attr("href");
+      const torrentPath = row.find("td:nth-child(2) a").last().attr("href") ?? "";
+      const filePath = row.find("td:nth-child(3) a:nth-child(1)").attr("href") ?? "";
 
       const torrent: Models.Torrent = {
         id: Number(torrentPath.split("/")[2]),
         title: row.find("td:nth-child(2) a").last().text(),
         link: Constants.NyaaBaseUrl + torrentPath,
         file: Constants.NyaaBaseUrl + filePath,
-        category: row.find("td:nth-child(1) a").attr("title"),
+        category: row.find("td:nth-child(1) a").attr("title") ?? "",
         size: row.find("td:nth-child(4)").text(),
         uploaded: row.find("td:nth-child(5)").text(),
         seeders: Number(row.find("td:nth-child(6)").text()),
         leechers: Number(row.find("td:nth-child(7)").text()),
         completed: Number(row.find("td:nth-child(8)").text()),
-        magnet: row.find("td:nth-child(3) a:nth-child(2)").attr("href"),
+        magnet: row.find("td:nth-child(3) a:nth-child(2)").attr("href") ?? "",
       };
 
       torrents.push(torrent);
