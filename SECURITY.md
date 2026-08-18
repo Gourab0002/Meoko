@@ -1,21 +1,24 @@
 # Security Policy
 
-## Supported Versions
+## Supported versions
 
-Use this section to tell people about which versions of your project are
-currently being supported with security updates.
+| Version | Supported |
+| ------- | --------- |
+| 1.x     | Yes       |
+| < 1.0   | No        |
 
-| Version | Supported          |
-| ------- | ------------------ |
-| 5.1.x   | :white_check_mark: |
-| 5.0.x   | :x:                |
-| 4.0.x   | :white_check_mark: |
-| < 4.0   | :x:                |
+This repository is an unofficial read-only scraper for public Nyaa listing and view pages. There is no authenticated user data and no persistent store.
 
-## Reporting a Vulnerability
+## Reporting a vulnerability
 
-Use this section to tell people how to report a vulnerability.
+Please open a [private security advisory](https://github.com/Gourab0002/Meoko/security/advisories/new) or email the repository owner through GitHub.
 
-Tell them where to go, how often they can expect to get an update on a
-reported vulnerability, what to expect if the vulnerability is accepted or
-declined, etc.
+You can expect an acknowledgement when the report is received, and an update once it has been triaged. If the issue is accepted, a fix will be shipped in a patch release when possible. If it is declined, we will explain why.
+
+Please do not open a public issue for anything that could be used to abuse this API or its upstream hosts.
+
+## Scope notes
+
+- This API only proxies public HTML from Nyaa mirrors. Do not send credentials, cookies, or private tracker data to it.
+- Path parameters are validated so IDs and usernames cannot be used to walk off `/view/` or `/user/`.
+- Reports about Nyaa itself should go to the Nyaa operators, not this project.

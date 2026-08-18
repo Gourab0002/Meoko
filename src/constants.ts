@@ -1,8 +1,9 @@
 export class Constants {
   static NyaaBaseUrl: string = "https://nyaa.si";
   static NyaaAltUrl: string = "https://nyaa.land";
-  static DefaultProfilePic: string =
-    "https://raw.githubusercontent.com/Yash-Garg/Nyaa-Api-Go/dev/static/default.png";
+  static UserAgent: string =
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36";
+  static FetchTimeoutMs: number = 15000;
 
   static NyaaEndpoints: Record<string, Record<string, string>> = {
     all: {
@@ -40,8 +41,21 @@ export class Constants {
     },
     software: {
       all: "6_0",
+      application: "6_1",
       applications: "6_1",
       games: "6_2",
     },
   };
+
+  static ValidSorts: Set<string> = new Set([
+    "",
+    "id",
+    "size",
+    "seeders",
+    "leechers",
+    "downloads",
+    "comments",
+  ]);
+
+  static ValidOrders: Set<string> = new Set(["", "asc", "desc"]);
 }

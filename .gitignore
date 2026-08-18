@@ -133,3 +133,8 @@ dist
 .devenv*
 devenv.local.nix
 .direnv
+
+# Wrangler
+.wrangler/
+.dev.vars
+dist-dry/

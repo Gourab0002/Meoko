@@ -1,23 +1,35 @@
 {
-  "name": "nyaa-api-ts",
-  "version": "1.0.0",
-  "description": "Nyaa Web Scraper using Typescript",
-  "main": "index.js",
+  "name": "meoko",
+  "version": "1.1.0",
+  "description": "Unofficial Nyaa torrent API",
+  "type": "module",
+  "main": "src/index.ts",
   "scripts": {
     "dev": "wrangler dev",
-    "deploy": "wrangler deploy"
+    "deploy": "wrangler deploy",
+    "start": "deno run --allow-net --allow-env src/index.ts",
+    "test": "tsx --test tests/parse.test.ts",
+    "typecheck": "tsc --noEmit"
   },
-  "keywords": [],
+  "keywords": [
+    "nyaa",
+    "torrent",
+    "api",
+    "hono"
+  ],
   "author": "",
-  "license": "ISC",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Gourab0002/Meoko.git"
+  },
   "devDependencies": {
-    "@types/node": "^18.11.17",
-    "typescript": "^4.9.4",
-    "wrangler": "^3.0.0"
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0",
+    "wrangler": "^3.80.0"
   },
   "dependencies": {
     "cheerio": "^1.0.0-rc.12",
-    "hono": "^4.6.0",
-    "ts-node": "^10.9.1"
+    "hono": "^4.6.0"
   }
 }

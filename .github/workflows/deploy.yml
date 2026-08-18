@@ -12,11 +12,12 @@ jobs:
     runs-on: ubuntu-latest
     name: Deploy
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-node@v3
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
         with:
-          node-version: 16
-      - run: npm install
+          node-version: 20
+          cache: npm
+      - run: npm ci
       - name: Publish API
         uses: cloudflare/wrangler-action@2.0.0
         with:

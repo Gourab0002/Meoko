@@ -14,15 +14,16 @@ A fast, type-safe **Unofficial Nyaa torrent API** built with TypeScript, [Hono](
 - 📄 **Pagination** — navigate through any result set page by page
 - 🌐 **CORS-enabled** — ready for use from any browser or frontend application
 - ⚡ **Edge-deployed** — runs on Cloudflare Workers or Deno Deploy for low-latency responses worldwide
-- 🛡️ **Null-safe scraping** — hardened against missing DOM elements and unexpected Nyaa markup changes
+- 🛡️ **Null-safe scraping** — hardened against missing DOM elements, magnet-only rows, and unexpected Nyaa markup changes
+- 🔁 **Mirror fallback** — tries `nyaa.si` first, then `nyaa.land` if the primary host is down or blocked
 
 ## Usage
 
 - `username` and `id` are required parameters if using `/user/{username}` and `/id/{id}` endpoints.
 
-- If no parameters are specified in other endpoints like `/anime`, `/manga`, etc. It will return the latest uploaded torrents in the respective category.
+- If no parameters are specified in other endpoints like `/anime`, `/manga`, etc. it will return the latest uploaded torrents in the respective category.
 
-- For Filters, input `filter=1` for _No Remakes_ and `filter=2` for _Trusted Only_.
+- For filters, use `f=1` (or `filter=1`) for _No Remakes_ and `f=2` (or `filter=2`) for _Trusted Only_.
 
 - #### Available Endpoints
 
@@ -31,7 +32,7 @@ A fast, type-safe **Unofficial Nyaa torrent API** built with TypeScript, [Hono](
   | `q` **(Optional)** | Search query.                                         |
   | `s` **(Optional)** | Sorting parameter                                     |
   | `p` **(Optional)** | Page number                                           |
-  | `f` **(Optional)** | Filter option                                         |
+  | `f` **(Optional)** | Filter option (`filter` is accepted as an alias)      |
   | `o` **(Optional)** | Order of sorting. Defaults to **_Descending order_**. |
 
   - **Endpoints**
@@ -44,8 +45,8 @@ A fast, type-safe **Unofficial Nyaa torrent API** built with TypeScript, [Hono](
     | Pictures | `/pictures` |
     | Live Action | `/live_action` |
     | Software | `/software` |
-    | ID | `/id` |
-    | User | `/user` |
+    | ID | `/id/{id}` |
+    | User | `/user/{username}` |
 
   - **Sub-Categories** (Not applicable for `/user` and `/id`)
     | **Category** | **Sub-Category** |
@@ -55,43 +56,74 @@ A fast, type-safe **Unofficial Nyaa torrent API** built with TypeScript, [Hono](
     | Audio | `/lossy`, `/lossless` |
     | Pictures | `/photos`, `/graphics` |
     | Live Action | `/promo`, `/eng`, `/non-eng`, `/raw` |
-    | Software | `/application`, `/games` |
+    | Software | `/application`, `/applications`, `/games` |
 
   - **Sorting Parameters**
     | **Arguments** | **Methods** |
     | ---- | ---- |
-    | Sort | `size`, `seeders`, `leechers`, `date`, `downloads` |
+    | Sort | `size`, `seeders`, `leechers`, `date`, `downloads`, `comments` |
     | Order | `asc`, `desc` |
 
 - #### Search using ID
 
-  - `https://nyaa-api-ts.yashg.workers.dev/id/{id}`
+  - `/id/{id}`
 
 - #### Search using category
 
-  - `https://nyaa-api-ts.yashg.workers.dev/{category}?q={search_query}`
-  - `https://nyaa-api-ts.yashg.workers.dev/{category}?q={search_query}&s={sorting_parameter}`
-  - `https://nyaa-api-ts.yashg.workers.dev/{category}?q={search_query}&s={sorting_parameter}&p={page_number}`
-  - `https://nyaa-api-ts.yashg.workers.dev/{category}?q={search_query}&s={sorting_parameter}&p={page_number}&o={order}`
-  - `https://nyaa-api-ts.yashg.workers.dev/{category}?q={search_query}&s={sorting_parameter}&p={page_number}&o={order}&f={filter}`
+  - `/{category}?q={search_query}`
+  - `/{category}?q={search_query}&s={sorting_parameter}`
+  - `/{category}?q={search_query}&s={sorting_parameter}&p={page_number}`
+  - `/{category}?q={search_query}&s={sorting_parameter}&p={page_number}&o={order}`
+  - `/{category}?q={search_query}&s={sorting_parameter}&p={page_number}&o={order}&f={filter}`
 
 - #### Search using sub category
 
-  - `https://nyaa-api-ts.yashg.workers.dev/{category}/{sub_category}?q={search_query}`
-  - `https://nyaa-api-ts.yashg.workers.dev/{category}/{sub_category}?q={search_query}&s={sorting_parameter}`
-  - `https://nyaa-api-ts.yashg.workers.dev/{category}/{sub_category}?q={search_query}&s={sorting_parameter}&p={page_number}`
-  - `https://nyaa-api-ts.yashg.workers.dev/{category}/{sub_category}?q={search_query}&s={sorting_parameter}&p={page_number}&o={order}`
-  - `https://nyaa-api-ts.yashg.workers.dev/{category}/{sub_category}?q={search_query}&s={sorting_parameter}&p={page_number}&o={order}&f={filter}`
+  - `/{category}/{sub_category}?q={search_query}`
+  - `/{category}/{sub_category}?q={search_query}&s={sorting_parameter}`
+  - `/{category}/{sub_category}?q={search_query}&s={sorting_parameter}&p={page_number}`
+  - `/{category}/{sub_category}?q={search_query}&s={sorting_parameter}&p={page_number}&o={order}`
+  - `/{category}/{sub_category}?q={search_query}&s={sorting_parameter}&p={page_number}&o={order}&f={filter}`
 
 - #### Search using username
-  - `https://nyaa-api-ts.yashg.workers.dev/user/{username}`
-  - `https://nyaa-api-ts.yashg.workers.dev/user/{username}?q={search_query}`
-  - `https://nyaa-api-ts.yashg.workers.dev/user/{username}?q={search_query}&s={sorting_parameter}`
-  - `https://nyaa-api-ts.yashg.workers.dev/user/{username}?q={search_query}&s={sorting_parameter}&p={page_number}`
-  - `https://nyaa-api-ts.yashg.workers.dev/user/{username}?q={search_query}&s={sorting_parameter}&p={page_number}&o={order}`
-  - `https://nyaa-api-ts.yashg.workers.dev/user/{username}?q={search_query}&s={sorting_parameter}&p={page_number}&o={order}&f={filter}`
+  - `/user/{username}`
+  - `/user/{username}?q={search_query}`
+  - `/user/{username}?q={search_query}&s={sorting_parameter}`
+  - `/user/{username}?q={search_query}&s={sorting_parameter}&p={page_number}`
+  - `/user/{username}?q={search_query}&s={sorting_parameter}&p={page_number}&o={order}`
+  - `/user/{username}?q={search_query}&s={sorting_parameter}&p={page_number}&o={order}&f={filter}`
+
+## Run locally
+
+```bash
+# Cloudflare Workers
+npm install
+npm run dev
+
+# Deno
+deno task start
+```
+
+```bash
+npm test
+npm run typecheck
+```
 
 ## Changelog
+
+### Reliability & scrape fixes
+
+- **Cloudflare Workers no longer crash on boot** -- `src/index.ts` now exports the Hono app for Workers and only calls `Deno.serve()` when the Deno runtime is present.
+- **Mirror fallback restored** -- requests try `nyaa.si`, then `nyaa.land`, and skip Cloudflare challenge pages instead of returning empty results.
+- **Listing scrape no longer depends on brittle column indexes** -- download/magnet links are selected by `href`, and size/date/seeders are read from the last cells so comment columns cannot shift fields.
+- **Magnet-only torrents** -- rows without a `.torrent` file now keep the magnet link instead of stuffing it into `file`.
+- **Comment timestamps and avatars** -- timestamps come from `small[data-timestamp]`; relative avatar URLs are resolved against the active mirror.
+- **Detail pages ignore injected ads** -- info hash is read from `<kbd>`, and Category/Date/Submitter/stats are read by label instead of `nth-child`.
+- **Query parameters are encoded** -- `URLSearchParams` is used so searches containing `&` or spaces cannot corrupt the upstream Nyaa URL. Missing `p`/`f` no longer become `NaN`.
+- **`filter` is accepted as an alias for `f`**, matching the documented filter names.
+- **`/software/application` works** -- the README path is now a real subcategory alias for `applications` (`6_1`).
+- **Invalid IDs, usernames, and categories return 400**; upstream failures return 502 instead of a blanket 404.
+- **`package-lock.json` matches `package.json`** -- the lockfile still listed `worktop` after the Hono rewrite.
+- **CI** -- `npm test` and `tsc --noEmit` run on push/PR.
 
 ### Bug Fixes (fix/all-issues)
 

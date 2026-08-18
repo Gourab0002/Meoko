@@ -39,3 +39,21 @@ export interface QueryParams {
   page: number;
   filter: number;
 }
+
+export interface FetchResult {
+  origin: string;
+  html: string;
+  status: number;
+}
+
+export type ErrorStatus = 400 | 404 | 502;
+
+export class HttpError extends Error {
+  status: ErrorStatus;
+
+  constructor(status: ErrorStatus, message: string) {
+    super(message);
+    this.name = "HttpError";
+    this.status = status;
+  }
+}

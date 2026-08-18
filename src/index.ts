@@ -19,4 +19,14 @@ app.get("/user/:username", Handlers.GetUserUploads);
 app.get("/:category", Handlers.GetCategoryTorrents);
 app.get("/:category/:subcategory", Handlers.GetCategoryTorrents);
 
-Deno.serve({ port: 3000 }, app.fetch);
+export default app;
+
+const deno = (
+  globalThis as {
+    Deno?: { serve: (options: { port: number }, handler: typeof app.fetch) => void };
+  }
+).Deno;
+
+if (deno?.serve) {
+  deno.serve({ port: 3000 }, app.fetch);
+}
