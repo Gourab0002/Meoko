@@ -1,163 +1,148 @@
 import { Context } from "hono";
-import * as cheerio from "cheerio";
-import * as Models from "./models.ts";
+import { Constants } from "./constants.ts";
+import type { File, ListingResponse, Torrent } from "./models.ts";
+import { HttpError } from "./models.ts";
+import {
+  isViewPage,
+  parseFileInfo,
+  parseListing,
+  parseRss,
+  parseRssMeta,
+} from "./parse.ts";
 import {
   extractViewId,
   fetchNyaa,
-  resolveUrl,
-  toCount,
+  setCache,
+  setListingHeaders,
+  wantsEnvelope,
 } from "./utils.ts";
 
-function labeledValue(
-  $: ReturnType<typeof cheerio.load>,
-  scope: ReturnType<ReturnType<typeof cheerio.load>>,
-  label: string
-): string {
-  const match = scope.find("div.row > div").filter((_, el) => {
-    return $(el).text().replace(/\s+/g, " ").trim() === label;
-  });
-  return match.first().next().text().replace(/\s+/g, " ").trim();
-}
+export {
+  flattenFileTree,
+  parseFileInfo,
+  parseListing,
+  parsePagination,
+  parseRss,
+  parseTorrentList,
+  parseUserProfile,
+} from "./parse.ts";
 
-export function parseTorrentList(
-  html: string,
+function listingBody(
+  torrents: Torrent[],
+  listing: ReturnType<typeof parseListing>,
   origin: string
-): Models.Torrent[] {
-  const $ = cheerio.load(html);
-  const torrents: Models.Torrent[] = [];
-
-  let rows = $("table.torrent-list tbody tr");
-  if (!rows.length) {
-    rows = $("tbody tr");
-  }
-
-  rows.each((_, selection) => {
-    const row = $(selection);
-    const titleLink = row
-      .find('a[href^="/view/"]')
-      .not(".comments")
-      .last();
-    const torrentPath = titleLink.attr("href") ?? "";
-    const id = extractViewId(torrentPath);
-
-    if (!id) {
-      return;
-    }
-
-    const downloadHref = row.find('a[href^="/download/"]').attr("href");
-    const magnetHref = row.find('a[href^="magnet:"]').attr("href");
-    const cells = row.find("td");
-    const last = cells.length;
-
-    torrents.push({
-      id,
-      title: titleLink.text().trim(),
-      link: resolveUrl(origin, torrentPath),
-      file: resolveUrl(origin, downloadHref),
-      magnet: magnetHref ?? "",
-      category: row.find("td:first-child a").attr("title") ?? "",
-      size: last >= 5 ? cells.eq(last - 5).text().trim() : "",
-      uploaded: last >= 4 ? cells.eq(last - 4).text().trim() : "",
-      seeders: last >= 3 ? toCount(cells.eq(last - 3).text()) : 0,
-      leechers: last >= 2 ? toCount(cells.eq(last - 2).text()) : 0,
-      completed: last >= 1 ? toCount(cells.eq(last - 1).text()) : 0,
-    });
-  });
-
-  return torrents;
-}
-
-export function parseFileInfo(
-  html: string,
-  origin: string,
-  fileId: number
-): Models.File | null {
-  const $ = cheerio.load(html);
-  const container = $("body div.container").last();
-
-  if (!container.length) {
-    return null;
-  }
-
-  const title = container
-    .find(".panel-heading h3.panel-title")
-    .first()
-    .text()
-    .trim();
-
-  if (!title) {
-    return null;
-  }
-
-  const downloadHref = container.find('a[href^="/download/"]').attr("href");
-  const magnetHref = container.find('a[href^="magnet:"]').attr("href") ?? "";
-  const infoHash = container.find("kbd").first().text().trim();
-  const commentTitle = container
-    .find("div#comments h3.panel-title")
-    .first()
-    .text();
-  const commentParts = commentTitle.split("-");
-  const commentCount = toCount(commentParts[commentParts.length - 1] ?? "0");
-
-  const comments: Models.Comment[] = [];
-  if (commentCount > 0) {
-    container
-      .find("div#comments div.comment-panel div.panel-body")
-      .each((_, selection) => {
-        const element = $(selection);
-        const avatar = element.find("img.avatar").attr("src");
-
-        comments.push({
-          name: element.find("a").first().text().trim(),
-          content: element.find("div.comment-content").text(),
-          image: resolveUrl(
-            origin,
-            avatar || "/static/img/avatar/default.png"
-          ),
-          timestamp: element.find("small[data-timestamp]").first().text().trim(),
-        });
-      });
-  }
-
-  const torrentData: Models.Torrent = {
-    title,
-    file: resolveUrl(origin, downloadHref),
-    link: `${origin}/view/${fileId}`,
-    id: fileId,
-    magnet: magnetHref,
-    size: labeledValue($, container, "File size:"),
-    category: labeledValue($, container, "Category:"),
-    uploaded: labeledValue($, container, "Date:"),
-    seeders: toCount(labeledValue($, container, "Seeders:")),
-    leechers: toCount(labeledValue($, container, "Leechers:")),
-    completed: toCount(labeledValue($, container, "Completed:")),
-  };
-
+): ListingResponse {
   return {
-    torrent: torrentData,
-    description: container.find("div.panel-body#torrent-description").text(),
-    submittedBy: labeledValue($, container, "Submitter:"),
-    infoHash,
-    commentInfo: {
-      count: commentCount,
-      comments,
-    },
+    torrents,
+    page: listing.pagination.page,
+    perPage: listing.pagination.perPage,
+    hasNext: listing.pagination.hasNext,
+    total: listing.pagination.total,
+    origin,
+    ...(listing.user ? { user: listing.user } : {}),
   };
 }
 
-export async function fileInfoScraper(c: Context, path: string) {
+export async function scrapeNyaa(
+  c: Context,
+  path: string,
+  options: { username?: string; envelope?: boolean } = {}
+) {
   const result = await fetchNyaa(path);
-  const fileId = extractViewId(path);
-  const file = parseFileInfo(result.html, result.origin, fileId);
+  const requestedPage = Number(c.req.query("p") ?? "1") || 1;
+  const listing = parseListing(
+    result.html,
+    result.origin,
+    requestedPage,
+    options.username
+  );
 
-  if (!file) {
-    return c.text("Not Found", 404);
+  setListingHeaders(c, listing.pagination, result.origin);
+  setCache(c, Constants.ListingCacheSeconds);
+
+  if (wantsEnvelope(c, options.envelope === true)) {
+    return c.json(listingBody(listing.torrents, listing, result.origin));
   }
 
+  return c.json(listing.torrents);
+}
+
+export async function scrapeRss(c: Context, path: string) {
+  const result = await fetchNyaa(path);
+  const torrents = parseRss(result.html, result.origin);
+  const meta = parseRssMeta(result.html);
+
+  setCache(c, Constants.ListingCacheSeconds);
+  c.header("X-Origin", result.origin);
+
+  return c.json({
+    title: meta.title,
+    description: meta.description,
+    origin: result.origin,
+    torrents,
+  });
+}
+
+function fileResponse(c: Context, file: File) {
+  setCache(c, Constants.DetailCacheSeconds);
+  c.header("X-Origin", file.origin);
   return c.json(file);
 }
 
-export async function scrapeNyaa(c: Context, path: string) {
+export async function loadFileInfo(path: string): Promise<File> {
   const result = await fetchNyaa(path);
-  return c.json(parseTorrentList(result.html, result.origin));
+  const fileId = extractViewId(result.url) || extractViewId(path);
+  const file = parseFileInfo(result.html, result.origin, fileId);
+
+  if (!file) {
+    throw new HttpError(404, "Not Found");
+  }
+
+  return file;
 }
+
+export async function loadFileInfoFromSearch(query: string): Promise<File> {
+  const result = await fetchNyaa(`/?q=${encodeURIComponent(query)}`);
+
+  if (isViewPage(result.html, result.url)) {
+    const fileId = extractViewId(result.url);
+    const file = parseFileInfo(result.html, result.origin, fileId);
+    if (file) {
+      return file;
+    }
+  }
+
+  throw new HttpError(404, "Not Found");
+}
+
+export async function fileInfoScraper(c: Context, path: string) {
+  const file = await loadFileInfo(path);
+  return fileResponse(c, file);
+}
+
+export async function fileSliceScraper(
+  c: Context,
+  path: string,
+  slice: "files" | "comments" | "trackers"
+) {
+  const file = await loadFileInfo(path);
+
+  setCache(c, Constants.DetailCacheSeconds);
+  c.header("X-Origin", file.origin);
+
+  if (slice === "files") {
+    return c.json({
+      status: file.fileListStatus,
+      files: file.files,
+      fileTree: file.fileTree,
+    });
+  }
+
+  if (slice === "comments") {
+    return c.json(file.commentInfo);
+  }
+
+  return c.json({ trackers: file.trackers, magnet: file.torrent.magnet });
+}
+
+
