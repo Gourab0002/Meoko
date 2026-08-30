@@ -30,6 +30,6 @@
   },
   "dependencies": {
     "cheerio": "^1.0.0-rc.12",
-    "hono": "^4.6.0"
+    "hono": "^4.13.5"
   }
 }
