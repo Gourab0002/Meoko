@@ -1,12 +1,8 @@
 {
   "version": "5",
   "specifiers": {
-    "npm:@types/node@^18.11.17": "18.19.130",
     "npm:cheerio@^1.0.0-rc.12": "1.2.0",
-    "npm:hono@^4.6.0": "4.12.3",
-    "npm:ts-node@^10.9.1": "10.9.2_@types+node@18.19.130_typescript@4.9.5",
-    "npm:typescript@^4.9.4": "4.9.5",
-    "npm:wrangler@3": "3.114.17_unenv@2.0.0-rc.14_workerd@1.20250718.0_esbuild@0.17.19"
+    "npm:hono@^4.6.0": "4.12.3"
   },
   "npm": {
     "@cloudflare/kv-asset-handler@0.3.4": {
@@ -837,12 +833,12 @@
     ],
     "packageJson": {
       "dependencies": [
-        "npm:@types/node@^18.11.17",
+        "npm:@types/node@^20.19.0",
         "npm:cheerio@^1.0.0-rc.12",
         "npm:hono@^4.6.0",
-        "npm:ts-node@^10.9.1",
-        "npm:typescript@^4.9.4",
-        "npm:wrangler@3"
+        "npm:tsx@^4.19.0",
+        "npm:typescript@^5.6.0",
+        "npm:wrangler@^4.125.0"
       ]
     }
   }

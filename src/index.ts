@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { Constants } from "./constants.ts";
+import type { RateLimiter } from "./models.ts";
 import { Handlers } from "./routes.ts";
 import { jsonError } from "./utils.ts";
 
@@ -26,6 +27,25 @@ app.use(
 app.use("*", async (c, next) => {
   await next();
   c.header("X-Meoko-Version", Constants.Version);
+});
+
+app.use("*", async (c, next) => {
+  const limiter = (c.env as { RATE_LIMITER?: RateLimiter } | undefined)?.RATE_LIMITER;
+  if (!limiter) {
+    await next();
+    return;
+  }
+
+  const ip = c.req.header("CF-Connecting-IP") ?? "anonymous";
+  try {
+    const { success } = await limiter.limit({ key: ip });
+    if (!success) {
+      return jsonError(c, 429, "Too Many Requests");
+    }
+  } catch {
+    // A broken rate-limit binding must not take the whole API down.
+  }
+  await next();
 });
 
 app.get("/", Handlers.Ping);

@@ -1,24 +1,8 @@
 import { Context } from "hono";
 import { Constants } from "./constants.ts";
-import { openApiSpec } from "./openapi.ts";
+import { openApiSpec, renderDocsHtml } from "./openapi.ts";
 import * as Scrapers from "./scrapers.ts";
 import * as Utils from "./utils.ts";
-
-const DOCS_HTML = `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <title>Meoko API</title>
-  <link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist@5/swagger-ui.css">
-</head>
-<body>
-  <div id="swagger-ui"></div>
-  <script src="https://unpkg.com/swagger-ui-dist@5/swagger-ui-bundle.js"></script>
-  <script>
-    window.ui = SwaggerUIBundle({ url: "/openapi.json", dom_id: "#swagger-ui" });
-  </script>
-</body>
-</html>`;
 
 function listingQuery(
   c: Context,
@@ -52,7 +36,7 @@ export class Handlers {
   };
 
   static Docs = function (c: Context) {
-    return c.html(DOCS_HTML);
+    return c.html(renderDocsHtml());
   };
 
   static OpenApi = function (c: Context) {
@@ -133,10 +117,23 @@ export class Handlers {
         return Utils.jsonError(c, 400, "Invalid info hash");
       }
 
-      const file = await Scrapers.loadFileInfoFromSearch(hash);
+      const lookup = await Scrapers.loadFileInfoFromSearch(hash);
+      if (lookup.kind === "listing") {
+        Utils.setListingHeaders(c, lookup.pagination, lookup.origin);
+        Utils.setCache(c, Constants.ListingCacheSeconds);
+        return c.json({
+          torrents: lookup.torrents,
+          page: lookup.pagination.page,
+          perPage: lookup.pagination.perPage,
+          hasNext: lookup.pagination.hasNext,
+          total: lookup.pagination.total,
+          origin: lookup.origin,
+        });
+      }
+
       Utils.setCache(c, Constants.DetailCacheSeconds);
-      c.header("X-Origin", file.origin);
-      return c.json(file);
+      c.header("X-Origin", lookup.file.origin);
+      return c.json(lookup.file);
     } catch (error) {
       return Utils.jsonErrorFrom(c, error);
     }
@@ -235,4 +232,4 @@ export class Handlers {
   };
 }
 
-export { DOCS_HTML };
+

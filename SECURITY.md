@@ -21,4 +21,5 @@ Please do not open a public issue for anything that could be used to abuse this 
 
 - This API only proxies public HTML from Nyaa mirrors. Do not send credentials, cookies, or private tracker data to it.
 - Path parameters are validated so IDs and usernames cannot be used to walk off `/view/` or `/user/`.
+- The deployed worker rate-limits each client IP. Query length, page number, and batch size are capped.
 - Reports about Nyaa itself should go to the Nyaa operators, not this project.

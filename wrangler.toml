@@ -4,5 +4,19 @@ compatibility_flags = ["nodejs_compat"]
 workers_dev = true
 main = "src/index.ts"
 
+[observability]
+enabled = true
+
+[observability.logs]
+enabled = true
+
 [dev]
 port = 3000
+
+[[ratelimits]]
+name = "RATE_LIMITER"
+namespace_id = "1001"
+
+  [ratelimits.simple]
+  limit = 120
+  period = 60

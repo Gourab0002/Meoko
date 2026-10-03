@@ -19,6 +19,8 @@ export interface Torrent {
   remake: boolean;
   hidden: boolean;
   deleted: boolean;
+  canonicalLink: string;
+  canonicalFile: string;
 }
 
 export interface Submitter {
@@ -53,6 +55,7 @@ export type FileListStatus = "ok" | "unavailable" | "too_many";
 export interface File {
   torrent: Torrent;
   description: string;
+  descriptionLinks: string[];
   submittedBy: string;
   submitter: Submitter;
   information: string;
@@ -121,7 +124,6 @@ export interface QueryParams {
   page: number;
   filter: number;
   category: string;
-  exclude: string;
   envelope: boolean;
   magnets: boolean;
   user: string;
@@ -147,7 +149,11 @@ export interface ErrorBody {
   status: number;
 }
 
-export type ErrorStatus = 400 | 404 | 502 | 503;
+export type ErrorStatus = 400 | 404 | 429 | 502 | 503;
+
+export interface RateLimiter {
+  limit(options: { key: string }): Promise<{ success: boolean }>;
+}
 
 export class HttpError extends Error {
   status: ErrorStatus;

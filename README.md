@@ -85,7 +85,7 @@ A fast, type-safe **Unofficial Nyaa torrent API** built with TypeScript, [Hono](
 
 - List endpoints (`/anime`, `/user/{username}`, …) still return a **JSON array** of torrents so existing clients keep working. Pagination is also sent as `X-Page`, `X-Per-Page`, `X-Has-Next`, `X-Total`, and `X-Origin`. Pass `envelope=1` for a wrapped object. `/search` uses the envelope by default.
 
-- Error responses are JSON: `{ "error": "Invalid ID", "status": 400 }`. Unknown subcategories now return **400** instead of silently falling back to the parent category.
+- Error responses are JSON: `{ "error": "Invalid ID", "status": 400 }`. Unknown subcategories return **400**. Unknown `s`, `o`, and `f` values return **400**, `p` above 50 returns **400**, and `q` longer than 200 characters returns **400**. A non-numeric `p` still means page 1. The deployed worker allows 120 requests per minute per IP per Cloudflare location and returns **429** when that budget is spent.
 
 - #### Search using ID
 
@@ -93,8 +93,8 @@ A fast, type-safe **Unofficial Nyaa torrent API** built with TypeScript, [Hono](
   - `/id/{id}/files`
   - `/id/{id}/comments`
   - `/id/{id}/trackers`
-  - `/hash/{infoHash}`
-  - `/ids?ids=1,2,3` (max 10)
+  - `/hash/{infoHash}` — one match returns the detail object. Several search rows return the listing envelope. No rows returns **404**.
+  - `/ids?ids=1,2,3` (max 10, duplicates are fetched once)
 
 - #### Search
 
@@ -139,13 +139,15 @@ Each torrent object includes the original fields plus:
 | `uploadedTimestamp` | Unix seconds when present on the page |
 | `commentCount` | Comment badge on listing rows |
 | `sizeBytes` | Parsed size using binary units (`GiB` = 1024³) |
-| `infoHash` | From the magnet `xt=urn:btih:` value, or RSS |
+| `infoHash` | From the magnet `xt=urn:btih:` value, or RSS. Hex hashes are lowercase. |
+| `link` / `file` | URLs on the mirror that answered |
+| `canonicalLink` / `canonicalFile` | The same paths on `https://nyaa.si` |
 | `trusted` | Green / trusted row |
 | `remake` | Red / remake row |
 | `hidden` | Hidden row |
 | `deleted` | Deleted row |
 
-`/id/{id}` also returns `information`, `submitter`, `trackers`, `files`, `fileTree`, `fileListStatus`, comment ids/timestamps/edited/uploader flags, and `origin`.
+`/id/{id}` also returns `information`, `descriptionLinks` (absolute URLs from the description), `submitter`, `trackers`, `files`, `fileTree`, `fileListStatus`, comment ids/timestamps/edited/uploader flags, and `origin`.
 
 ## Run locally
 
@@ -164,6 +166,19 @@ npm run typecheck
 ```
 
 ## Changelog
+
+### 1.3.0 — Upstream reliability and stricter queries
+
+- **Edge cache** — successful upstream HTML is cached in the Workers cache (60s for listings, RSS, and user pages; 180s for view pages). `/id/{id}/files`, `/comments`, and `/trackers` share that view-page cache.
+- **Mirror failover** — a challenge page or any 200 that is not a Nyaa listing, view, or RSS feed tries the next mirror. A real empty search still returns an empty list. The first mirror times out after 4 seconds; the last mirror keeps the 10 second timeout. A 404 does not try the next mirror.
+- **Query limits** — unknown sort, order, and filter values return 400. `p` above 50 and `q` longer than 200 characters return 400. `/ids` drops duplicate ids before fetching.
+- **Rate limit** — the worker binding allows 120 requests per minute per IP per Cloudflare location.
+- **`hasNext`** — a full last page with a disabled Next link no longer reports another page.
+- **`/hash/{hash}`** — one search row is loaded as a detail page. Several rows return the listing envelope.
+- **Canonical URLs and description links** — `canonicalLink` and `canonicalFile` always point at `nyaa.si`. Detail responses include `descriptionLinks`.
+- **Info hashes** — 40-character hex hashes are lowercase. RSS magnets built from an info hash include `dn`.
+- **`/docs`** — the HTML reference is served by the worker. The machine-readable spec remains `/openapi.json`.
+- **`exclude`** — removed. Nyaa search does not use that parameter.
 
 ### 1.2.0 — Nyaa feature coverage
 

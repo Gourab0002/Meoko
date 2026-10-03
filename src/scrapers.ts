@@ -1,6 +1,6 @@
 import { Context } from "hono";
 import { Constants } from "./constants.ts";
-import type { File, ListingResponse, Torrent } from "./models.ts";
+import type { File, ListingResponse, Pagination, Torrent } from "./models.ts";
 import { HttpError } from "./models.ts";
 import {
   isViewPage,
@@ -101,15 +101,39 @@ export async function loadFileInfo(path: string): Promise<File> {
   return file;
 }
 
-export async function loadFileInfoFromSearch(query: string): Promise<File> {
+export type HashLookup =
+  | { kind: "detail"; file: File }
+  | {
+      kind: "listing";
+      torrents: Torrent[];
+      pagination: Pagination;
+      origin: string;
+    };
+
+export async function loadFileInfoFromSearch(query: string): Promise<HashLookup> {
   const result = await fetchNyaa(`/?q=${encodeURIComponent(query)}`);
 
   if (isViewPage(result.html, result.url)) {
     const fileId = extractViewId(result.url);
     const file = parseFileInfo(result.html, result.origin, fileId);
     if (file) {
-      return file;
+      return { kind: "detail", file };
     }
+  }
+
+  const listing = parseListing(result.html, result.origin, 1);
+  if (listing.torrents.length === 1) {
+    const file = await loadFileInfo(`/view/${listing.torrents[0].id}`);
+    return { kind: "detail", file };
+  }
+
+  if (listing.torrents.length > 1) {
+    return {
+      kind: "listing",
+      torrents: listing.torrents,
+      pagination: listing.pagination,
+      origin: result.origin,
+    };
   }
 
   throw new HttpError(404, "Not Found");

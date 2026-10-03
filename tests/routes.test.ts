@@ -154,6 +154,17 @@ test("categories and openapi are served locally", async () => {
   const openapi = await spec.json();
   assert.equal(openapi.info.version, Constants.Version);
   assert.ok(openapi.paths["/search"]);
+  assert.ok(openapi.components.schemas.Torrent);
+  assert.ok(openapi.components.schemas.ErrorBody);
+  assert.ok(openapi.components.schemas.ListingEnvelope);
+  assert.ok(openapi.components.schemas.File);
+
+  const docs = await app.request("/docs");
+  assert.equal(docs.status, 200);
+  const html = await docs.text();
+  assert.equal(html.includes("unpkg.com"), false);
+  assert.equal(html.includes("/openapi.json"), true);
+  assert.equal(html.includes("GET /search"), true);
 });
 
 test("category listings stay arrays and expose pagination headers", async () => {
@@ -184,6 +195,22 @@ test("envelope=1 wraps listings without dropping torrent fields", async () => {
       assert.ok(body.origin);
     }
   );
+});
+
+test("search rejects invalid sort, order, filter, page, and long queries", async () => {
+  const cases = [
+    "/search?s=nope",
+    "/search?o=sideways",
+    "/search?f=3",
+    "/search?p=51",
+    `/search?q=${"a".repeat(201)}`,
+  ];
+  for (const path of cases) {
+    const res = await app.request(path);
+    assert.equal(res.status, 400, path);
+    const body = await res.json();
+    assert.equal(body.status, 400);
+  }
 });
 
 test("search rejects an unknown c= value", async () => {
@@ -242,6 +269,49 @@ test("id details include files, trackers, and information", async () => {
   );
 });
 
+test("hash lookup loads the single search hit", async () => {
+  const hash = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+  const seen: string[] = [];
+  await withMockFetch(
+    (url) => {
+      seen.push(url);
+      if (url.includes("/view/")) {
+        return html(VIEW_HTML, url);
+      }
+      return html(LISTING_HTML, url);
+    },
+    async () => {
+      const res = await app.request(`/hash/${hash}`);
+      assert.equal(res.status, 200);
+      const body = await res.json();
+      assert.equal(body.torrent.title, "Example");
+      assert.ok(seen.some((url) => url.includes("/view/2148063")));
+    }
+  );
+});
+
+test("hash lookup returns a listing when several rows match", async () => {
+  const hash = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+  const twoRows = LISTING_HTML.replace(
+    "</tbody>",
+    `<tr class="default"><td><a href="/?c=1_2" title="Anime"></a></td><td><a href="/view/8">Other</a></td><td><a href="magnet:?xt=urn:btih:bbb"></a></td><td>1 B</td><td data-timestamp="1">t</td><td>1</td><td>0</td><td>0</td></tr></tbody>`
+  );
+  let calls = 0;
+  await withMockFetch(
+    (url) => {
+      calls += 1;
+      return html(twoRows, url);
+    },
+    async () => {
+      const res = await app.request(`/hash/${hash}`);
+      assert.equal(res.status, 200);
+      const body = await res.json();
+      assert.equal(body.torrents.length, 2);
+      assert.equal(calls, 1);
+    }
+  );
+});
+
 test("hash lookup follows a view page", async () => {
   const hash = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
   await withMockFetch(
@@ -269,6 +339,20 @@ test("batch ids cap at 10 and return per-id results", async () => {
       assert.equal(body.results[0].data.torrent.title, "Example");
     }
   );
+
+  let calls = 0;
+  await withMockFetch(
+    () => {
+      calls += 1;
+      return html(VIEW_HTML, "https://nyaa.si/view/1");
+    },
+    async () => {
+      const res = await app.request("/ids?ids=1,1,1");
+      const body = await res.json();
+      assert.equal(body.results.length, 1);
+      assert.equal(calls, 1);
+    }
+  );
 });
 
 test("user uploads accept a category filter", async () => {
@@ -290,4 +374,20 @@ test("user uploads accept a category filter", async () => {
       assert.equal(body.user.trusted, true);
     }
   );
+});
+
+test("rate limit answers 429 and still allows a healthy limiter", async () => {
+  const blocked = await app.request("/", { method: "GET" }, {
+    RATE_LIMITER: { limit: async () => ({ success: false }) },
+  });
+  assert.equal(blocked.status, 429);
+  assert.deepEqual(await blocked.json(), { error: "Too Many Requests", status: 429 });
+  assert.equal(blocked.headers.get("access-control-allow-origin"), "*");
+  assert.equal(blocked.headers.get("X-Meoko-Version"), Constants.Version);
+
+  const allowed = await app.request("/", { method: "GET" }, {
+    RATE_LIMITER: { limit: async () => ({ success: true }) },
+  });
+  assert.equal(allowed.status, 200);
+  assert.equal(await allowed.text(), "Nyaa API v2 // Alive");
 });

@@ -1,6 +1,6 @@
 {
   "name": "meoko",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "description": "Unofficial Nyaa torrent API",
   "type": "module",
   "main": "src/index.ts",
@@ -8,8 +8,8 @@
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
     "start": "deno run --allow-net --allow-env src/index.ts",
-    "test": "tsx --test tests/parse.test.ts tests/routes.test.ts",
-    "typecheck": "tsc --noEmit"
+    "test": "tsx --test tests/parse.test.ts tests/routes.test.ts tests/fetch.test.ts",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.test.json"
   },
   "keywords": [
     "nyaa",
@@ -24,6 +24,7 @@
     "url": "https://github.com/Gourab0002/Meoko.git"
   },
   "devDependencies": {
+    "@types/node": "^20.19.0",
     "tsx": "^4.19.0",
     "typescript": "^5.6.0",
     "wrangler": "^4.125.0"

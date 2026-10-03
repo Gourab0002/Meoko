@@ -1,5 +1,7 @@
+import packageJson from "../package.json" with { type: "json" };
+
 export class Constants {
-  static Version: string = "1.2.0";
+  static Version: string = packageJson.version;
   static NyaaBaseUrl: string = "https://nyaa.si";
   static NyaaAltUrl: string = "https://nyaa.land";
   static UserAgent: string =
@@ -8,6 +10,8 @@ export class Constants {
   static HealthTimeoutMs: number = 4000;
   static ResultsPerPage: number = 75;
   static MaxBatchIds: number = 10;
+  static MaxPage: number = 50;
+  static MaxQueryLength: number = 200;
   static ListingCacheSeconds: number = 60;
   static DetailCacheSeconds: number = 180;
 

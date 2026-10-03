@@ -97,19 +97,6 @@ export function resolveCategoryParam(raw: string | undefined): string | undefine
   return getCategoryID(category, subcategory);
 }
 
-function parsePositiveInt(value: string | undefined, fallback: number): number {
-  if (value === undefined || value === "") {
-    return fallback;
-  }
-
-  const parsed = Number(value);
-  if (!Number.isFinite(parsed) || parsed < 0) {
-    return fallback;
-  }
-
-  return Math.floor(parsed);
-}
-
 function isTruthyQuery(value: string | undefined): boolean {
   if (value === undefined) {
     return false;
@@ -123,18 +110,47 @@ export function getSearchParameters(
   options: { readCategory?: boolean } = {}
 ): QueryParams {
   const q = c.req.query("q") ?? "";
-  const p = parsePositiveInt(c.req.query("p"), 1);
-  const rawFilter = c.req.query("f") ?? c.req.query("filter");
-  const f = parsePositiveInt(rawFilter, 0);
-  const oRaw = (c.req.query("o") ?? "").toLowerCase();
-  let s = c.req.query("s") ?? "";
+  if (q.length > Constants.MaxQueryLength) {
+    throw new HttpError(400, `Query too long (max ${Constants.MaxQueryLength} characters)`);
+  }
 
+  const rawPage = c.req.query("p");
+  let page = 1;
+  if (rawPage !== undefined && rawPage !== "" && /^\d+$/.test(rawPage)) {
+    page = Number(rawPage);
+    if (page > Constants.MaxPage) {
+      throw new HttpError(400, `Page out of range (max ${Constants.MaxPage})`);
+    }
+    if (page < 1) {
+      page = 1;
+    }
+  }
+
+  const rawFilter = c.req.query("f") ?? c.req.query("filter");
+  let filter = 0;
+  if (rawFilter !== undefined && rawFilter !== "") {
+    if (!/^\d+$/.test(rawFilter)) {
+      throw new HttpError(400, "Invalid filter");
+    }
+    filter = Number(rawFilter);
+    if (!Constants.ValidFilters.has(filter)) {
+      throw new HttpError(400, "Invalid filter");
+    }
+  }
+
+  const oRaw = (c.req.query("o") ?? "").toLowerCase();
+  if (!Constants.ValidOrders.has(oRaw)) {
+    throw new HttpError(400, "Invalid order");
+  }
+
+  let s = c.req.query("s") ?? "";
   if (s === "date") {
     s = "id";
   }
+  if (!Constants.ValidSorts.has(s)) {
+    throw new HttpError(400, "Invalid sort");
+  }
 
-  const order = Constants.ValidOrders.has(oRaw) ? oRaw : "";
-  const sort = Constants.ValidSorts.has(s) ? s : "";
   const rawCategory = options.readCategory === false ? undefined : c.req.query("c");
   let category = "";
 
@@ -148,12 +164,11 @@ export function getSearchParameters(
 
   return {
     query: q,
-    page: p > 0 ? p : 1,
-    order,
-    sort,
-    filter: f,
+    page,
+    order: oRaw,
+    sort: s,
+    filter,
     category,
-    exclude: c.req.query("exclude") ?? "",
     envelope: wantsEnvelope(c, false),
     magnets: isTruthyQuery(c.req.query("magnets")) || c.req.query("m") !== undefined,
     user: c.req.query("u") ?? c.req.query("user") ?? "",
@@ -208,10 +223,6 @@ export function buildSearchQuery(
 
   params.set("f", String(queryParams.filter));
 
-  if (queryParams.exclude) {
-    params.set("exclude", queryParams.exclude);
-  }
-
   const user = extras.u || queryParams.user;
   if (user) {
     params.set("u", user);
@@ -225,6 +236,37 @@ export function buildSearchQuery(
   }
 
   return params.toString();
+}
+
+export function normalizeInfoHash(value: string): string {
+  const trimmed = value.trim();
+  if (/^[a-fA-F0-9]{40}$/.test(trimmed)) {
+    return trimmed.toLowerCase();
+  }
+  return trimmed;
+}
+
+export function canonicalNyaaUrl(href: string | undefined): string {
+  if (!href) {
+    return "";
+  }
+
+  if (href.startsWith("magnet:") || href.startsWith("data:")) {
+    return href;
+  }
+
+  try {
+    const url = new URL(href, Constants.NyaaBaseUrl);
+    if (url.protocol !== "http:" && url.protocol !== "https:") {
+      return href;
+    }
+    const base = new URL(Constants.NyaaBaseUrl);
+    url.protocol = base.protocol;
+    url.host = base.host;
+    return url.toString();
+  } catch {
+    return href;
+  }
 }
 
 export function resolveUrl(origin: string, href: string | undefined): string {
@@ -281,7 +323,7 @@ export function extractInfoHash(magnet: string | undefined): string {
   }
 
   const match = magnet.match(/xt=urn:btih:([a-zA-Z0-9]+)/i);
-  return match ? match[1] : "";
+  return match ? normalizeInfoHash(match[1]) : "";
 }
 
 export function parseMagnet(magnet: string | undefined): {
@@ -298,7 +340,7 @@ export function parseMagnet(magnet: string | undefined): {
   const xt = params.get("xt") ?? "";
 
   return {
-    infoHash: xt.replace(/^urn:btih:/i, ""),
+    infoHash: normalizeInfoHash(xt.replace(/^urn:btih:/i, "")),
     name: params.get("dn") ?? "",
     trackers: params.getAll("tr"),
   };
@@ -325,6 +367,100 @@ export function parseSizeBytes(value: string | undefined): number {
 
 function isChallengePage(html: string): boolean {
   return html.includes("<title>Just a moment...</title>");
+}
+
+export function looksLikeNyaa(html: string): boolean {
+  if (/<(?:rss|channel)\b/i.test(html)) {
+    return true;
+  }
+  if (/torrent-list|torrent-description/i.test(html)) {
+    return true;
+  }
+  if (/no (?:results|torrents) found/i.test(html)) {
+    return true;
+  }
+  if (/\bBrowsing\b/.test(html)) {
+    return true;
+  }
+  return /info hash:/i.test(html) && /panel-title/i.test(html);
+}
+
+export function mirrorTimeoutMs(index: number, count: number): number {
+  if (count <= 1 || index >= count - 1) {
+    return Constants.FetchTimeoutMs;
+  }
+  return Constants.HealthTimeoutMs;
+}
+
+function cacheTtl(path: string): number {
+  const pathname = path.split("?")[0] ?? path;
+  if (pathname.startsWith("/view/")) {
+    return Constants.DetailCacheSeconds;
+  }
+  return Constants.ListingCacheSeconds;
+}
+
+interface EdgeCache {
+  match(request: Request): Promise<Response | undefined>;
+  put(request: Request, response: Response): Promise<void>;
+}
+
+function edgeCache(): EdgeCache | null {
+  const storage = (globalThis as { caches?: { default?: EdgeCache } }).caches;
+  const cache = storage?.default;
+  if (!cache || typeof cache.match !== "function" || typeof cache.put !== "function") {
+    return null;
+  }
+  return cache;
+}
+
+function cacheRequest(origin: string, path: string): Request {
+  const url = new URL("https://cache.meoko.internal/");
+  url.searchParams.set("origin", origin);
+  url.searchParams.set("path", path);
+  return new Request(url);
+}
+
+async function readCached(origin: string, path: string): Promise<FetchResult | null> {
+  const cache = edgeCache();
+  if (!cache) {
+    return null;
+  }
+
+  try {
+    const cached = await cache.match(cacheRequest(origin, path));
+    if (!cached) {
+      return null;
+    }
+    return {
+      origin,
+      html: await cached.text(),
+      status: cached.status,
+      url: cached.headers.get("X-Meoko-Upstream-Url") || `${origin}${path}`,
+    };
+  } catch {
+    return null;
+  }
+}
+
+async function writeCached(result: FetchResult, path: string): Promise<void> {
+  const cache = edgeCache();
+  if (!cache) {
+    return;
+  }
+
+  const ttl = cacheTtl(path);
+  const headers = new Headers();
+  headers.set("Cache-Control", `public, max-age=${ttl}`);
+  headers.set("X-Meoko-Upstream-Url", result.url);
+  try {
+    await cache.put(
+      cacheRequest(result.origin, path),
+      new Response(result.html, { status: 200, headers })
+    );
+  } catch {
+    // A cache write must not fail the request that already has a good page.
+  }
 }
 
 export function mirrors(): string[] {
@@ -365,6 +501,9 @@ async function fetchOrigin(
     if (isChallengePage(html)) {
       throw new HttpError(502, `Upstream challenge page from ${origin}`);
     }
+    if (!looksLikeNyaa(html)) {
+      throw new HttpError(502, `Upstream did not return a Nyaa page from ${origin}`);
+    }
 
     return {
       origin,
@@ -377,13 +516,25 @@ async function fetchOrigin(
   }
 }
 
-export async function fetchNyaa(path: string): Promise<FetchResult> {
+export async function fetchNyaa(
+  path: string,
+  options: { timeoutsMs?: readonly number[] } = {}
+): Promise<FetchResult> {
   const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+  const origins = mirrors();
   let lastError: unknown;
 
-  for (const origin of mirrors()) {
+  for (let index = 0; index < origins.length; index++) {
+    const origin = origins[index] ?? "";
+    const timeoutMs = options.timeoutsMs?.[index] ?? mirrorTimeoutMs(index, origins.length);
     try {
-      return await fetchOrigin(origin, normalizedPath, Constants.FetchTimeoutMs);
+      const cached = await readCached(origin, normalizedPath);
+      if (cached) {
+        return cached;
+      }
+      const result = await fetchOrigin(origin, normalizedPath, timeoutMs);
+      await writeCached(result, normalizedPath);
+      return result;
     } catch (error) {
       if (error instanceof HttpError && error.status === 404) {
         throw error;
@@ -477,8 +628,16 @@ export function parseIdList(raw: string | undefined): string[] {
   if (!raw) {
     return [];
   }
-  return raw
-    .split(/[,\s]+/)
-    .map((id) => id.trim())
-    .filter(Boolean);
+
+  const ids: string[] = [];
+  const seen = new Set<string>();
+  for (const part of raw.split(/[,\s]+/)) {
+    const id = part.trim();
+    if (!id || seen.has(id)) {
+      continue;
+    }
+    seen.add(id);
+    ids.push(id);
+  }
+  return ids;
 }

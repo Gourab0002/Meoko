@@ -12,9 +12,11 @@ import type {
   UserProfile,
 } from "./models.ts";
 import {
+  canonicalNyaaUrl,
   extractCategoryId,
   extractInfoHash,
   extractViewId,
+  normalizeInfoHash,
   parseMagnet,
   parseSizeBytes,
   resolveUrl,
@@ -88,6 +90,8 @@ function torrentFromParts(
     | "remake"
     | "hidden"
     | "deleted"
+    | "canonicalLink"
+    | "canonicalFile"
   > &
     Partial<Torrent>
 ): Torrent {
@@ -109,11 +113,13 @@ function torrentFromParts(
     file: partial.file,
     link: partial.link,
     magnet,
-    infoHash: partial.infoHash ?? extractInfoHash(magnet),
+    infoHash: normalizeInfoHash(partial.infoHash ?? extractInfoHash(magnet)),
     trusted: partial.trusted ?? false,
     remake: partial.remake ?? false,
     hidden: partial.hidden ?? false,
     deleted: partial.deleted ?? false,
+    canonicalLink: canonicalNyaaUrl(partial.link),
+    canonicalFile: canonicalNyaaUrl(partial.file),
   };
 }
 
@@ -177,13 +183,14 @@ export function parsePagination(
 ): Pagination {
   const $ = cheerio.load(html);
   const perPage = Constants.ResultsPerPage;
-  const activeText = $("ul.pagination li.active").first().text();
+  const pagination = $("ul.pagination");
+  const activeText = pagination.find("li.active").first().text();
   const activePage = toCount(activeText);
   const page = activePage > 0 ? activePage : requestedPage > 0 ? requestedPage : 1;
 
-  const nextEnabled = $("ul.pagination li.next").not(".disabled").length > 0;
+  const nextEnabled = pagination.find("li.next").not(".disabled").length > 0;
   let laterPage = false;
-  $("ul.pagination a[href]").each((_, el) => {
+  pagination.find("a[href]").each((_, el) => {
     const href = $(el).attr("href") ?? "";
     const value = extractQueryNumber(href, "p");
     if (value > page) {
@@ -192,7 +199,11 @@ export function parsePagination(
   });
 
   const hasNext =
-    itemCount === 0 ? false : nextEnabled || laterPage || itemCount >= perPage;
+    itemCount === 0
+      ? false
+      : pagination.length > 0
+        ? nextEnabled || laterPage
+        : itemCount >= perPage;
 
   let total: number | null = null;
   const boldTotal = html.match(/of\s+<b>([\d,]+)<\/b>/i);
@@ -400,6 +411,25 @@ function parseInformation(
   return text;
 }
 
+function parseDescriptionLinks(
+  $: CheerioRoot,
+  container: CheerioSelection,
+  origin: string
+): string[] {
+  const links: string[] = [];
+  container.find("div#torrent-description a[href]").each((_, el) => {
+    const href = $(el).attr("href") ?? "";
+    if (!href || href.startsWith("#") || href.toLowerCase().startsWith("javascript:")) {
+      return;
+    }
+    const resolved = resolveUrl(origin, href);
+    if (resolved) {
+      links.push(resolved);
+    }
+  });
+  return links;
+}
+
 function parseComments($: CheerioRoot, container: CheerioSelection, origin: string): Comment[] {
   const comments: Comment[] = [];
 
@@ -472,8 +502,9 @@ export function parseFileInfo(
   const downloadHref = container.find('a[href^="/download/"]').attr("href");
   const magnetHref = container.find('a[href^="magnet:"]').attr("href") ?? "";
   const magnet = parseMagnet(magnetHref);
-  const infoHash =
-    container.find("kbd").first().text().trim() || magnet.infoHash;
+  const infoHash = normalizeInfoHash(
+    container.find("kbd").first().text().trim() || magnet.infoHash
+  );
   const commentTitle = container.find("div#comments h3.panel-title").first().text();
   const commentParts = commentTitle.split("-");
   const listedCount = toCount(commentParts[commentParts.length - 1] ?? "0");
@@ -510,6 +541,7 @@ export function parseFileInfo(
   return {
     torrent: torrentData,
     description: container.find("div.panel-body#torrent-description").text(),
+    descriptionLinks: parseDescriptionLinks($, container, origin),
     submittedBy: submitter.name,
     submitter,
     information: parseInformation($, container, origin),
@@ -576,12 +608,12 @@ export function parseRss(xml: string, origin: string): Torrent[] {
     const link = item.find("link").first().text().trim();
     const title = item.find("title").first().text().trim();
     const id = extractViewId(guid) || extractViewId(link);
-    const infoHash = rssChildText(item, "infoHash");
+    const infoHash = normalizeInfoHash(rssChildText(item, "infoHash"));
     const size = rssChildText(item, "size");
     const magnet = link.startsWith("magnet:")
       ? link
       : infoHash
-        ? `magnet:?xt=urn:btih:${infoHash}`
+        ? `magnet:?xt=urn:btih:${infoHash}${title ? `&dn=${encodeURIComponent(title)}` : ""}`
         : "";
     const file = /^https?:/i.test(link) && /\/download\//.test(link) ? link : "";
     const pubDate = item.find("pubDate").first().text().trim();

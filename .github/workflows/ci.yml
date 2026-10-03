@@ -19,3 +19,7 @@ jobs:
       - run: npm ci
       - run: npm test
       - run: npm run typecheck
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - run: deno check src/index.ts

@@ -9,8 +9,10 @@ import {
   parseTorrentList,
   parseUserProfile,
 } from "../src/scrapers.ts";
+import { HttpError } from "../src/models.ts";
 import {
   buildSearchQuery,
+  canonicalNyaaUrl,
   extractCategoryId,
   extractInfoHash,
   extractViewId,
@@ -21,6 +23,7 @@ import {
   isValidId,
   isValidInfoHash,
   isValidUsername,
+  normalizeInfoHash,
   parseIdList,
   parseMagnet,
   parseSizeBytes,
@@ -147,7 +150,7 @@ const VIEW_HTML = `
         <a href="magnet:?xt=urn:btih:e386a18cbd5525b5515a3b118e365033ec190465&amp;dn=Example&amp;tr=http://nyaa.tracker.wf:7777/announce">Magnet</a>
       </div>
     </div>
-    <div markdown-text class="panel-body" id="torrent-description">Released by SubsPlease</div>
+    <div markdown-text class="panel-body" id="torrent-description">Released by SubsPlease. <a href="https://subsplease.org/shows/">Show page</a><a href="javascript:alert(1)">bad</a></div>
     <div class="panel panel-default">
       <div class="panel-heading">
         <h3 class="panel-title">File list</h3>
@@ -238,11 +241,15 @@ test("parseTorrentList maps listing rows including magnet-only torrents", () => 
     remake: false,
     hidden: false,
     deleted: false,
+    canonicalLink: "https://nyaa.si/view/2148068",
+    canonicalFile: "https://nyaa.si/download/2148068.torrent",
   });
 
   assert.equal(torrents[1].id, 2148063);
   assert.equal(torrents[1].title, "Commented Torrent");
   assert.equal(torrents[1].file, "");
+  assert.equal(torrents[1].canonicalFile, "");
+  assert.equal(torrents[1].canonicalLink, "https://nyaa.si/view/2148063");
   assert.equal(torrents[1].magnet, "magnet:?xt=urn:btih:def456");
   assert.equal(torrents[1].seeders, 70);
   assert.equal(torrents[1].completed, 1109);
@@ -268,6 +275,19 @@ test("parsePagination treats a short last page as terminal", () => {
   assert.equal(pagination.hasNext, false);
 });
 
+test("parsePagination does not invent a next page when the last page is full", () => {
+  const html = `<ul class="pagination"><li class="active"><a>2</a></li><li class="next disabled"><a>Next</a></li></ul>`;
+  const pagination = parsePagination(html, 75, 2);
+  assert.equal(pagination.hasNext, false);
+});
+
+test("parsePagination uses the row count when pagination markup is missing", () => {
+  const full = parsePagination("<table class='torrent-list'></table>", 75, 1);
+  const short = parsePagination("<table class='torrent-list'></table>", 10, 1);
+  assert.equal(full.hasNext, true);
+  assert.equal(short.hasNext, false);
+});
+
 test("parseFileInfo reads labeled fields, hash, files, and comments", () => {
   const file = parseFileInfo(VIEW_HTML, "https://nyaa.land", 2148063);
 
@@ -282,6 +302,9 @@ test("parseFileInfo reads labeled fields, hash, files, and comments", () => {
   assert.equal(file.torrent.size, "1.3 GiB");
   assert.equal(file.torrent.completed, 0);
   assert.equal(file.torrent.file, "https://nyaa.land/download/2148063.torrent");
+  assert.equal(file.torrent.link, "https://nyaa.land/view/2148063");
+  assert.equal(file.torrent.canonicalLink, "https://nyaa.si/view/2148063");
+  assert.equal(file.torrent.canonicalFile, "https://nyaa.si/download/2148063.torrent");
   assert.equal(
     file.torrent.magnet,
     "magnet:?xt=urn:btih:e386a18cbd5525b5515a3b118e365033ec190465&dn=Example&tr=http://nyaa.tracker.wf:7777/announce"
@@ -294,7 +317,8 @@ test("parseFileInfo reads labeled fields, hash, files, and comments", () => {
   assert.equal(file.information, "https://subsplease.org/");
   assert.equal(file.infoHash, "e386a18cbd5525b5515a3b118e365033ec190465");
   assert.deepEqual(file.trackers, ["http://nyaa.tracker.wf:7777/announce"]);
-  assert.equal(file.description, "Released by SubsPlease");
+  assert.equal(file.description, "Released by SubsPlease. Show pagebad");
+  assert.deepEqual(file.descriptionLinks, ["https://subsplease.org/shows/"]);
   assert.equal(file.fileListStatus, "ok");
   assert.equal(file.files.length, 1);
   assert.equal(file.files[0].path, "Example/[SubsPlease] Example - 08 (1080p).mkv");
@@ -343,8 +367,10 @@ test("parseRss maps namespaced nyaa fields", () => {
   assert.equal(torrents[0].file, "https://nyaa.land/download/2148063.torrent");
   assert.equal(
     torrents[0].magnet,
-    "magnet:?xt=urn:btih:e386a18cbd5525b5515a3b118e365033ec190465"
+    "magnet:?xt=urn:btih:e386a18cbd5525b5515a3b118e365033ec190465&dn=Commented%20Torrent"
   );
+  assert.equal(torrents[0].canonicalFile, "https://nyaa.si/download/2148063.torrent");
+  assert.equal(torrents[0].canonicalLink, "https://nyaa.si/view/2148063");
 });
 
 test("parseUserProfile reads trusted heading and upload count", () => {
@@ -384,6 +410,7 @@ test("validation helpers reject unsafe ids and usernames", () => {
   assert.equal(isValidInfoHash("e386a18cbd5525b5515a3b118e365033ec190465"), true);
   assert.equal(isValidInfoHash("not-a-hash"), false);
   assert.deepEqual(parseIdList("1, 2,3"), ["1", "2", "3"]);
+  assert.deepEqual(parseIdList("1, 2,1"), ["1", "2"]);
 });
 
 test("query builder encodes values and omits empty optional fields", () => {
@@ -395,7 +422,6 @@ test("query builder encodes values and omits empty optional fields", () => {
       order: "asc",
       filter: 1,
       category: "",
-      exclude: "",
       envelope: false,
       magnets: false,
       user: "",
@@ -430,6 +456,34 @@ test("getSearchParameters defaults NaN-safe values and accepts filter alias", ()
   assert.equal(params.page, 1);
   assert.equal(params.filter, 2);
   assert.equal(params.order, "");
+});
+
+test("getSearchParameters rejects invalid sort, order, filter, page, and long queries", () => {
+  const make = (values: Record<string, string>) =>
+    ({
+      req: { query: (key: string) => values[key] },
+    }) as never;
+
+  const cases: Record<string, string>[] = [
+    { s: "nope" },
+    { o: "sideways" },
+    { f: "3" },
+    { filter: "9" },
+    { p: "51" },
+    { q: "a".repeat(201) },
+  ];
+  for (const values of cases) {
+    assert.throws(
+      () => getSearchParameters(make(values)),
+      (error: unknown) => error instanceof HttpError && error.status === 400
+    );
+  }
+
+  const maxPage = getSearchParameters(make({ p: "50", s: "seeders", o: "asc", f: "0" }));
+  assert.equal(maxPage.page, 50);
+  assert.equal(maxPage.sort, "seeders");
+  assert.equal(maxPage.order, "asc");
+  assert.equal(maxPage.filter, 0);
 });
 
 test("getSearchParameters resolves c and envelope flags", () => {
@@ -467,6 +521,14 @@ test("url, magnet, size, and number helpers", () => {
   assert.equal(extractViewId("nope"), 0);
   assert.equal(extractCategoryId("/?c=1_2"), "1_2");
   assert.equal(extractInfoHash("magnet:?xt=urn:btih:abc123&dn=x"), "abc123");
+  assert.equal(
+    extractInfoHash("magnet:?xt=urn:btih:E386A18CBD5525B5515A3B118E365033EC190465"),
+    "e386a18cbd5525b5515a3b118e365033ec190465"
+  );
+  assert.equal(normalizeInfoHash("ABCDEFGHIJKLMNOPQRSTUVWXYZ234567"), "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567");
+  assert.equal(canonicalNyaaUrl("https://nyaa.land/view/1?q=a"), "https://nyaa.si/view/1?q=a");
+  assert.equal(canonicalNyaaUrl("magnet:?xt=1"), "magnet:?xt=1");
+  assert.equal(canonicalNyaaUrl(""), "");
   assert.equal(parseSizeBytes("1.3 GiB"), Math.round(1.3 * 1024 ** 3));
   assert.equal(parseSizeBytes("12.0 MiB"), Math.round(12 * 1024 ** 2));
   assert.deepEqual(parseMagnet("magnet:?xt=urn:btih:abc&dn=n&tr=udp://a&tr=udp://b"), {
